@@ -1,8 +1,10 @@
-from fastapi import FastAPI
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List
 
-app = FastAPI()
+router = APIRouter(prefix="/users",
+                   tags= ["users"],
+                   responses={404: {"message": "No encontrado"}})
 
 
 class User(BaseModel):
@@ -23,38 +25,42 @@ users = [
 ]
 
 
-@app.get("/usersjson")
+@router.get("/json")
 async def get_usersjson():
     return [{"name": "Robin", "surname": "Espinoza", "url": "https://robin.com"},
             {"name": "Joaquin", "surname": "Espinoza", "url": "https://quin.com"},
             {"name": "Katy", "surname": "Lazaro", "url": "https://katy.com"}]
 
 
-@app.get("/users")
+@router.get("/")
 async def get_users():
     return users
 
 
-@app.get("/user/{id}")  # Path
+@router.get("/{id}")  # Path
 async def get_user(id: int):
     return search_user(id)
 
 
-@app.get("/userquery/")  # Query
+@router.get("/query/")  # Query
 async def get_user(id: int):
     return search_user(id)
 
 
-@app.post("/user/")
+@router.post("/", status_code=201)
 async def create_user(user: User):
     if type(search_user(user.id)) == User:
-        return {"status": False, "message": "El usuario ya existe"}
+        raise HTTPException(
+            status_code=409,
+            detail="El usuario ya existe"
+            )
+        # return {"status": False, "message": "El usuario ya existe"}
     else:
         users.append(user)
         return user
 
 
-@app.put("/user/")
+@router.put("/")
 async def update_user(user: User):
     matching_users = list(filter(
         lambda saved_user: saved_user.id == user.id, users)
@@ -67,6 +73,21 @@ async def update_user(user: User):
             return {"status": False, "message": "No se ha podido actualizar el usuario"}
     else:
         return {"status": False, "message": "El usuario que desea actualizar no existe"}
+
+
+@router.delete("/{id_user}")
+async def delete_user(id_user: int):
+    matching_users = list(filter(
+        lambda saved_user: saved_user.id == id_user, users)
+    )
+    if len(matching_users) > 0:
+        is_deleted = delete_user(id_user)
+        if is_deleted:
+            return {"status": True, "message": "Se ha eliminado el usuario"}
+        else:
+            return {"status": False, "message": "No se ha podido eliminar el usuario"}
+    else:
+        return {"status": False, "message": "El usuario que desea eliminar no existe"}
 
 
 def search_user(id: int):
@@ -85,6 +106,19 @@ def update_user(updated_user: User) -> bool:
         for index, saved_user in enumerate(users):
             if saved_user.id == updated_user.id:
                 users[index] = updated_user
+                found = True
+    except:
+        return False
+
+    return found
+
+
+def delete_user(id_user: int) -> bool:
+    found = False
+    try:
+        for index, saved_user in enumerate(users):
+            if saved_user.id == id_user:
+                del users[index]
                 found = True
     except:
         return False
